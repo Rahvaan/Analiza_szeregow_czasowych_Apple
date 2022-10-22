@@ -1,0 +1,1 @@
+Jest to sprawozdanie na temat wskaźników analizy technicznej użytych na przykładzie fimry Apple
