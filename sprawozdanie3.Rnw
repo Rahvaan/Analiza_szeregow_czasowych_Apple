@@ -1,0 +1,388 @@
+\documentclass[12pt, a4paper]{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % dodatkowe pakiety LaTeX'a
+\usepackage[OT4]{polski}
+\usepackage[utf8]{inputenc}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[colorlinks=true, linkcolor=blue]{hyperref}
+\usepackage{mathtools}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ustawienia globalne
+<<ustawienia_globalne, echo=FALSE, warning=FALSE>>=
+library(knitr)
+library(xtable) #pakiet do tworzenia tabel w formacie LaTeX'a
+opts_chunk$set(fig.path='figure/', fig.align='center', fig.pos='H',fig.width=5, fig.height=4)
+# UWAGA: w razie potrzeby można zmieniać te ustawienia w danym chunk'u!
+@
+  
+  
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % strona tytulowa
+\title{Sprawozdanie 3}
+\author{Maciej Łosiewicz \\ album 256319}
+\maketitle
+\tableofcontents
+
+<<wstep, echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, results='hide', message=FALSE>>=
+library(ggplot2)
+library(GGally)
+library(tidyverse)
+library(expsmooth)
+library(corrplot)
+library(regclass)
+library(sur)
+library(olsrr)
+library(signal)
+library(MASS)
+library(fANCOVA)
+library(kader)
+library(stats)
+library(xts)
+library(manipulate)
+library(caret)
+library(leaps)
+library(forecast)
+library(TTR)
+library(xts)
+library(quantmod)
+library(kableExtra)
+library(astsa)
+library("vars")
+library("asympTest")
+@
+\section{Zadanie 1}
+\subsection{Wskaźniki analizy technicznej}
+\subsubsection{Wskaźnik MACD}
+
+\begin{itemize}
+
+\item Jest on członkiem grupy oscylatorów momentum. Wyliczany jest na podstawie kilku średnich kroczących
+
+\item Składa się z dwóch linii - MACD oraz "linii signal"
+
+\item Linia MACD = Śr. długookresowa - śr. krótkookresowa
+
+\item Linia sygnalna = Średnia z linii MACD
+
+\item Jeżeli linia MACD kieruje się w górę to mamy do czynienia z sygnałem pozytywnym, jeśli w dół – z sygnałem negatywnym
+
+\item Linię MACD uznajemy za linię kupna bądź sprzedaży w zależności czy przecina linię sygnalną z dołu czy od góry
+
+\end{itemize}
+
+
+\subsubsection{Wskaźnik STS/SMI}
+
+
+\begin{itemize}
+
+\item Jeden ze wskaźników momentum
+
+\item Oblicza stosunek zmiany ceny zamknięcia do różnicy ceny minimalnej i maksymalnej, a wartości te są jeszcze dodatkowo uśredniane za pomocą średniej ruchomej
+
+\item Składa się z dwóch linii – $K$ oraz $D$. 
+
+\item $K$ obliczana jest na podstawie wzoru:
+
+\[
+ \%K = 100\dfrac{(C – Min)}{(Max – Min)} 
+\]
+
+Gdzie $C$ = cena zamknięcia z bieżącego dnia, $Min$ = cena minimalna z całego okresu, a $Max$ = cena maksymalna z całego okresu
+
+\item $D$ to 3-okresowa średnia krocząca linii $K$, nazywana także szybkim oscylatorem stochastycznym
+
+\end{itemize}
+
+
+\subsubsection{Wstęga Bollingera}
+
+
+\begin{itemize}
+
+\item Wskaźnik wstęgi Bollingera wykorzystuje odchylenie standardowe w celu określenia, gdzie może pojawić się możliwy poziom wsparcia lub oporu.
+
+\item Wstęgi Bollingera występują jako dwie linie, zarówno powyżej, jak i poniżej centralnej średniej kroczącej, które obejmują cenę.
+
+\item Wstęgi Bollingera są konstruowane poprzez dodawanie i odejmowanie odchylenia standardowego średniej ruchomej, wskazując zmienność rynku
+
+\end{itemize}
+
+
+
+\subsection{Wizualizacja wybranych wskaźników}
+
+Do analizy wybierzmy spółkę Apple
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres danych AAPL'>>=
+
+
+getSymbols("AAPL", from = "2019/01/01", to = "2020/01/01", periodicity = "daily",
+           src = "yahoo", auto.assign = getOption('getSymbols.auto.assign', TRUE))
+
+chartSeries(AAPL, type = "line")
+
+@
+
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Podział danych na zakres tygodniowy'>>=
+
+chartSeries(to.weekly(AAPL), up.col='lightgreen', dn.col='red')
+
+@
+
+\subsubsection{Wskaźnik MACD}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres danych ze wskaźnikiem MACD'>>=
+
+chartSeries(AAPL, type = "line")
+addMACD()
+
+@
+
+\begin{itemize}
+
+\item Kiedy linia MACD (czerwona) przecina poziom 0 pokazuje to, że momentum się zmienia i potencjalnie tworzony jest nowy trend. 
+
+\item Gdy dwie linie wskaźnika MACD oddalają się od siebie oznacza to, że rośnie momentum, a gdy są coraz bliżej, to cena traci siłę
+
+\end{itemize}
+
+\subsubsection{Wskaźnik STS/SMI}
+
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres danych ze wskaźnikiem SMI'>>=
+
+chartSeries(AAPL, type = "auto")
+addSMI()
+addTA(stoch(HLC(AAPL)), col=2:4)
+
+@
+
+
+\begin{itemize}
+
+\item Ten oscylator stochastyczny zbudowany jest z dwóch linii - oscylatora wolnego $K$ (niebieska linia) oraz szybkiego $D$
+
+\item Kiedy linia $D$ przecina $K$ od dołu, należy kupować akcję, i analogicznie gdy przecina od góry należy myśleć o sprzedaży
+
+\end{itemize}
+
+\subsubsection{Wstęga Bollingera}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres danych ze wstęgą Bollingera'>>=
+
+chartSeries(AAPL, type = "auto")
+addBBands()
+
+@
+
+
+\begin{itemize}
+
+\item Szerokość wstęgi zależy od odchylenia standardowego. Przy zwężeniu należy spodziewać się zmiany cen, a po tym rozszerzenie i stabliność notowań.
+
+\end{itemize}
+
+\subsection{Wybór parametrów}
+
+\subsubsection{Wskaźnik MACD}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres MACD dla różnych parametrów', fig.height=8, fig.width=8>>=
+
+
+par(mfrow = c(2, 2))
+
+macd1 <- MACD(Cl(AAPL), nFast = 8, nSlow = 22, nSig = 6, percent = FALSE)
+macd2 <- MACD(Cl(AAPL), nFast = 12, nSlow = 26, nSig = 9, percent = FALSE)
+macd3 <- MACD(Cl(AAPL), nFast = 16, nSlow = 30, nSig = 12, percent = FALSE)
+macd4 <- MACD(Cl(AAPL), nFast = 22, nSlow = 36, nSig = 18, percent = FALSE)
+
+plot(macd1, main = NULL)
+plot(macd2, main = NULL)
+plot(macd3, main = NULL)
+plot(macd4, main = NULL)
+
+par(mfrow = c(1, 1))
+@
+
+Przy zwiększeniu wartości parametrów widzimy oddalenie się linii co symbolizuje wzrost momentum, a co za tym idzie trend zyskuje siłę. Analogicznie dla małych parametrów lniie są blisko siebie co symbolizuje że cena traci siłę.
+
+\subsubsection{Wskaźnik SMI}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres SMI dla różnych parametrów', fig.height=8, fig.width=8>>=
+
+
+par(mfrow = c(2, 2))
+
+smi1 <- SMI(Cl(AAPL), n = 10, nFast = 1, nSlow = 20, nSig = 6)
+smi2 <- SMI(Cl(AAPL), n = 13, nFast = 2, nSlow = 25, nSig = 9)
+smi3 <- SMI(Cl(AAPL), n = 17, nFast = 5, nSlow = 27, nSig = 11)
+smi4 <- SMI(Cl(AAPL), n = 20, nFast = 8, nSlow = 30, nSig = 14)
+
+plot(smi1, main = NULL)
+plot(smi2, main = NULL)
+plot(smi3, main = NULL)
+plot(smi4, main = NULL)
+
+par(mfrow = c(1, 1))
+@
+
+Tak jak można się było domyślić, zwiększenie parametrów też i w tym wypadku oddala od siebie linie $K$ i $D$
+
+
+\subsubsection{Wstęga Bollingera}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres wstęgi dla różnych parametrów', fig.height=8, fig.width=8>>=
+
+
+par(mfrow = c(2, 2))
+
+bband1 <- BBands(Cl(AAPL), n = 15, sd = 1)
+bband2 <- BBands(Cl(AAPL), n = 20, sd = 2)
+bband3 <- BBands(Cl(AAPL), n = 24, sd = 4)
+bband4 <- BBands(Cl(AAPL), n = 32, sd = 8)
+
+plot(bband1, main = NULL)
+plot(bband2, main = NULL)
+plot(bband3, main = NULL)
+plot(bband4, main = NULL)
+
+par(mfrow = c(1, 1))
+
+@
+
+Tak jak w poprzednich przypadkach, zwiększenie parametrów drastycznie zwiększa szerokość wstęgi.
+
+\section{Zadanie 2}
+
+\subsection{Weryfikacja stacjonarności danych}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE, fig.cap='Wykres danych'>>=
+
+autoplot(globtemp, xlab="czas", ylab="temperatura")
+ggtsdisplay(globtemp)
+
+@
+
+Łatwo zauważyć że ACF maleje, a więc korelacja także maleje, i to w sposób podobny do liniowego. Natomiast dla PACF widać że pierwsza obserwacja wynosi prawie 1, co oznacza, że cząstkowa autokorelacja wskazuje nam istnienie trendu
+
+Przejdźmy do wielomianowej transformacji danych
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+trend.sq <- tslm(globtemp ~ I(trend^2) + trend)
+autoplot(cbind(globtemp, trend.sq$fitted), lwd = 1)
+
+globtemp.r <- globtemp - trend.sq$fitted
+ggtsdisplay(globtemp.r) 
+
+@
+
+Z wykresów ACF i PACF identyfikujemy MA(4) oraz AR(1)
+
+\subsection{Estymacja modelu}
+
+Wykorzystamy metody Yule'a-Walkera oraz metodę największej wiarygodności.
+
+Najpierw dla Yule'a-Walkera:
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+yw <- ar(globtemp.r, order.max = 1, aic = FALSE, method = "yw")
+yw
+yw$asy.var.coef
+
+@
+
+Następnie dla mle:
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+mle <- ar(globtemp.r, order.max = 1,  aic = FALSE, method = "mle")
+mle
+mle$asy.var.coef
+
+@
+
+Teraz sprawdźmy różnicę między tymi dwoma metodami:
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+abs(yw$asy.var.coef - mle$asy.var.coef)
+
+@
+
+\subsection{Przedziały ufności}
+
+Teraz skonstruujemy przedziały ufności dla modelu AR(4) %(dla AR(1) w modelu wielomianowym pojawia się błąd)
+
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+
+globtemp.diff <- diff(globtemp)
+yw <- ar(globtemp.diff, order.max = 4,  aic = FALSE, method="yw")
+mle <- ar(globtemp.diff, order.max = 4,  aic = FALSE, method="mle")
+asymp.test(yw$ar)
+asymp.test(mle$ar)
+
+@
+
+\subsection{Weryfikacja poprawności dopasowania}
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+
+res.yw <- yw$resid
+res.mle <-mle$resid
+
+Box.test(res.yw)
+Box.test(res.yw, lag = 20, fitdf = yw$order)
+
+Box.test(res.mle)
+Box.test(res.mle, lag = 20, fitdf = mle$order)
+
+Box.test(res.yw, type = "Ljung-Box")
+Box.test(res.yw, lag = 20, type = ("Ljung-Box"), fitdf = yw$order)
+
+Box.test(res.mle, type = "Ljung-Box")
+Box.test(res.mle, lag = 20, type = ("Ljung-Box"), fitdf = mle$order)
+
+@
+
+Jak widać z testów mamy tylko po jednej kolumnie która znajduje się poza naszym zasięgiem.
+
+\subsection{Prognoza}
+
+Wykonajmy prognozę dla kolejnych wykresów:
+
+<<echo=FALSE, eval=TRUE, error=FALSE, warning=FALSE, message=FALSE>>=
+
+n <- length(globtemp)
+
+fc.diff <- predict(yw, n.ahead = 10)$pred
+fc <- diffinv(fc.diff, xi = globtemp[n])
+plot(globtemp)
+lines(fc, col = "orange")
+autoplot(cbind(globtemp, fc))
+
+fc.diff <- predict(mle, n.ahead = 10)$pred
+fc <- diffinv(fc.diff, xi = globtemp[n])
+plot(globtemp)
+lines(fc, col = "orange")
+autoplot(cbind(globtemp, fc))
+
+@
+
+
+
+\end{document}
+
